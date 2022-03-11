@@ -1,6 +1,8 @@
 import * as path from "https://deno.land/std@0.129.0/path/mod.ts";
 import Promise from "https://esm.sh/bluebird";
 
+const time_start = performance.now();
+
 const archive_path = path.resolve(Deno.args[0]);
 const archive_name = path.basename(archive_path);
 const archive_dir = path.dirname(archive_path);
@@ -34,6 +36,7 @@ Deno.mkdirSync(converted_dir);
 let count = 0;
 const files_count = input_files.length;
 await Promise.map(input_files, async (input_file) => {
+  const time_conv_start = performance.now();
   const output_name = path.resolve(converted_dir, input_file.name + ".avif");
   const extract_process = Deno.run({
     cmd: [
@@ -58,7 +61,12 @@ await Promise.map(input_files, async (input_file) => {
   });
   await extract_process.status();
   count++;
-  console.log(`Processed ${count}/${files_count} (${output_name})`);
+  const time_conv_end = performance.now();
+  console.log(
+    `Processed ${count}/${files_count} (${output_name}, ${
+      (time_conv_end - time_conv_start) / 1000
+    } secs)`,
+  );
 }, {
   concurrency: 6,
 });
@@ -82,4 +90,6 @@ Deno.removeSync(converted_dir, { recursive: true });
 
 console.log("Cleaned up\n");
 
-console.log("Completed!");
+const time_end = performance.now();
+
+console.log(`Completed in ${(time_end - time_start) / 1000} secs`);
