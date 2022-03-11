@@ -8,7 +8,7 @@ const archive_name = path.basename(archive_path);
 const archive_dir = path.dirname(archive_path);
 const extracted_dir = path.resolve(archive_dir, `${archive_name}.extracted`);
 const converted_dir = path.resolve(archive_dir, `${archive_name}.temp`);
-const output_path = path.resolve(
+const archive_output_path = path.resolve(
   archive_dir,
   archive_name.split(/\.(?=[^.]+$)/)[0] + "_avif.zip",
 );
@@ -37,25 +37,28 @@ let count = 0;
 const files_count = input_files.length;
 await Promise.map(input_files, async (input_file) => {
   const time_conv_start = performance.now();
-  const output_name = path.resolve(converted_dir, input_file.name + ".avif");
+  const output_path = path.resolve(converted_dir, input_file.name + ".avif");
+
+  // deno-fmt-ignore
+  const cmd_avifenc = [
+    "avifenc",
+    "-s", "5",
+    "--min","10", "--max","60",
+    "--minalpha","10","--maxalpha","60",
+    "-y","420",
+    input_file.path,output_path
+  ];
+  // deno-fmt-ignore
+  const cmd_cavif = [
+    "cavif",
+    "--quality", "50",
+    "--speed","4",
+    input_file.path,
+    "-o", output_path
+  ];
+
   const extract_process = Deno.run({
-    cmd: [
-      "avifenc",
-      "-s",
-      "4",
-      "--min",
-      "1",
-      "--max",
-      "63",
-      "--minalpha",
-      "1",
-      "--maxalpha",
-      "63",
-      "-y",
-      "420",
-      input_file.path,
-      output_name,
-    ],
+    cmd: cmd_avifenc,
     stdin: "null",
     stdout: "null",
   });
@@ -63,7 +66,7 @@ await Promise.map(input_files, async (input_file) => {
   count++;
   const time_conv_end = performance.now();
   console.log(
-    `Processed ${count}/${files_count} (${output_name}, ${
+    `Processed ${count}/${files_count} (${output_path}, ${
       (time_conv_end - time_conv_start) / 1000
     } secs)`,
   );
@@ -77,7 +80,7 @@ const archive_process = Deno.run({
   cmd: [
     "7z",
     "a",
-    output_path,
+    archive_output_path,
     path.resolve(converted_dir, "*"),
   ],
 });
