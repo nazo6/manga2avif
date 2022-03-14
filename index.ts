@@ -1,8 +1,9 @@
-import * as path from "path"
-import * as fs from "fs/promises"
-import { exec, execSync } from "child_process"
-import sharp from "sharp"
-import Promises from "bluebird"
+import * as path from "path";
+import * as fs from "fs/promises";
+import { execSync } from "child_process";
+import sharp from "sharp";
+import Promises from "bluebird";
+import flatten from "@hutsoninc/flatten-dir";
 
 const input_path = path.resolve(process.argv[2]);
 const input_name = path.basename(input_path);
@@ -15,22 +16,25 @@ const archive_output_path = path.resolve(
 );
 
 async function extract_archive() {
-  execSync(["7z", "x", input_path, `-o${extracted_dir}`, `-mmt6`].join(" "))
-  fs.mkdir(converted_dir, {recursive:true})
+  execSync(
+    ["7z", "x", `"${input_path}"`, `-o"${extracted_dir}"`, `-mmt6`].join(" "),
+  );
+  await flatten(extracted_dir);
+  fs.mkdir(converted_dir, { recursive: true });
 }
 
 async function convert_files() {
   const target_files = (await fs.readdir(extracted_dir)).map((name) => {
     return {
       name,
-      path: path.resolve(extracted_dir, name)
-    }
-  })
+      path: path.resolve(extracted_dir, name),
+    };
+  });
 
   let converted_count = 0;
   await Promises.map(target_files, async (file) => {
-    const out_name = file.name.split(/\.(?=[^.]+$)/)[0] + ".avif"
-    const out_path = path.resolve(converted_dir, out_name)
+    const out_name = file.name.split(/\.(?=[^.]+$)/)[0] + ".avif";
+    const out_path = path.resolve(converted_dir, out_name);
 
     await sharp(file.path)
       .resize(null, 1000)
@@ -38,31 +42,42 @@ async function convert_files() {
       .toFile(out_path);
 
     converted_count++;
-    console.log(`Converted ${converted_count}/${target_files.length} (${out_path})`);
+    console.log(
+      `Converted ${converted_count}/${target_files.length} (${out_path})`,
+    );
   }, {
-    concurrency: 5
-  })
+    concurrency: 5,
+  });
 }
 
 async function create_archive() {
-  execSync(["7z", "a", archive_output_path, path.resolve(converted_dir, "*"), `-mmt6`].join(" "))
+  execSync(
+    [
+      "7z",
+      "a",
+      `"${archive_output_path}"`,
+      `"${path.resolve(converted_dir, "*")}"`,
+      `-mmt6`,
+    ]
+      .join(" "),
+  );
 }
 
 async function clean() {
-  await fs.rm(extracted_dir, {recursive: true, force: true})
-  await fs.rm(converted_dir, {recursive: true, force: true})
+  await fs.rm(extracted_dir, { recursive: true, force: true });
+  await fs.rm(converted_dir, { recursive: true, force: true });
 }
 
 const main = async () => {
-  console.log("Extracting archive")
-  await extract_archive()
-  console.log("Converting files")
-  await convert_files()
-  console.log("Creating archive")
-  await create_archive()
-  console.log("Cleaning up")
-  await clean()
-  console.log("Completed!")
-}
+  console.log("Extracting archive");
+  await extract_archive();
+  console.log("Converting files");
+  await convert_files();
+  console.log("Creating archive");
+  await create_archive();
+  console.log("Cleaning up");
+  await clean();
+  console.log("Completed!");
+};
 
-main()
+main();
